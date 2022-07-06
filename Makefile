@@ -7,3 +7,5 @@ lets-talk.o: lets-talk.c list.h
 list.o: list.c list.h
 	gcc -c list.c
 	
+clean:
+	rm -rf lets-talk.o list.o

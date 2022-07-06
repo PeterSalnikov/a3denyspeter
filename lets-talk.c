@@ -27,16 +27,12 @@ void* input_thread(void *lst)
 	int ret;
 	while(1)
 	{
-		printf("we are in the thread\n");
 		char input[buf];
 		fgets(input, buf, stdin);
 			
 		ret = List_add(lst, (char *)input);
 		if(ret == 1)
 			pthread_exit(&ret);
-		//testing output
-		char *test = List_curr(lst);
-		printf("%s", test);
 		
 		if(strcmp(input, "!exit\n") == 0)
 		{
@@ -51,7 +47,22 @@ void* input_thread(void *lst)
 	pthread_exit(&ret);
 }
 
+void *print_message(void *lst)
+{
+
+	char *msg = List_curr(lst);
+	printf("%s", msg);
+
+}
+
 void *sender_thread(void *lst)
+{
+
+
+
+}
+
+void *await_udp()
 {
 
 
