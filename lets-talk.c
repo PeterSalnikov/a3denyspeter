@@ -16,7 +16,6 @@ required threads:
 #include <netdb.h>
 #include <sys/time.h>
 #include <unistd.h>
-// #define STDIN 0 
 
 const int BUFFER_SIZE = 4000;
 char buffer[4000];
@@ -157,11 +156,20 @@ void *udp_receiver_thread(void * ptr) {
 
 int main (int argc, char ** argv) 
 {
-	printf("ADDRESS: %s\n", argv[2]);
+
+	if(argc < 4) {
+		printf("Usage:\n");
+		printf("\t./lets-talk <local port> <remote host> <remote port>\n");
+		printf("Examples:\n");
+		printf("\t./lets-talk 3000 192.168.0.513 3001\n");
+		printf("\t./lets-talk 3000 some-computer-name 3001\n");
+		return 1;
+	}
+
 	//receiver
-	int socket_info; //socket_info
+	int socket_info; 
 	struct addrinfo hints, *server_info, *p;
-	int addr_info; //stores result of getaddrinfo
+	int addr_info; 
 	struct sockaddr_storage address_two;
 	
 	memset(&hints, 0, sizeof hints);
@@ -174,7 +182,6 @@ int main (int argc, char ** argv)
 		return 1;
 	}
 
-	// bind to first possible result
 	for(p = server_info; p != NULL; p = p->ai_next) {
 		if ((socket_info = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) {
 			perror("Reciever Error: ");
@@ -196,7 +203,7 @@ int main (int argc, char ** argv)
 		return 2;
 	}
 
-	//SENDER
+	//sender
 	int sender_socket_info;
 	struct addrinfo sender_hints, *sender_server_info, *sender_p;
 	int sender_addr_info;
@@ -231,19 +238,7 @@ int main (int argc, char ** argv)
 	
 	List * output_list;
 	output_list = List_create();
-/*
-	struct thread_params params;
-	params.receiver_p = p;
-	params.receiveraddr = their_addr;
-	params.receiver_socketfd = socket_info;
-	
-	params.sender_socketfd = sender_socket_info;
-	params.sender_serverinfo = sender_serverinfo;
-	params.sender_p = sender_p;
-	
-	params.sending_list = input_list;
-	params.receiving_list = output_list;
-*/
+
 	struct reciever_params receiver;
 	receiver.address = address_two;
 	receiver.receiver_socket = socket_info;

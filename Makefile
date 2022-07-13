@@ -9,3 +9,6 @@ list.o: list.c list.h
 	
 clean:
 	rm -rf lets-talk.o list.o
+
+valgrind: 
+	valgrind --leak-check=full ./lets-talk 3000 localhost 3001
