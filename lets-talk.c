@@ -23,12 +23,12 @@ int encryption_key = 1;
 
 pthread_mutex_t Mutex = PTHREAD_MUTEX_INITIALIZER;
 
-void *keyboard_input_thread(List* output_list) {
+void *keyboard_input_thread(List* input_list) {
 	printf("Welcome to LetS-Talk! Please type your message now.\n");
 	// Get keywords
 	while(!is_exit) {
 		if(fgets(buffer, BUFFER_SIZE, stdin)){
-			List_add(output_list, (char *)buffer);
+			List_add(input_list, (char *)buffer);
 		}
 	} 
 	pthread_exit(NULL);
@@ -49,11 +49,11 @@ void *console_output_thread(List* input_list) {
 
 }
 
-void *udp_sender_thread(List* output_list, int sender_socket, struct addrinfo* sender_info) {
+void *udp_sender_thread(List* input_list, int sender_socket, struct addrinfo* sender_info) {
 	int i;
 	while(!is_exit) {
-		if(List_count(output_list)) {
-			char * message = List_remove(output_list);
+		if(List_count(input_list)) {
+			char * message = List_remove(input_list);
 			// encryption
 			for(i = 0; i < strlen(message); i++) {
 				if(message[i] != '\n' && message[i] != '\0') {
@@ -102,7 +102,7 @@ void *udp_sender_thread(List* output_list, int sender_socket, struct addrinfo* s
 
 }
 
-void *udp_receiver_thread(struct sockaddr_storage address, int receiver_socket, List* input_list) {
+void *udp_receiver_thread(struct sockaddr_storage address, int receiver_socket, List* output_list) {
 	int i;
 	while(!is_exit) {
 		char buf[BUFFER_SIZE];
@@ -123,7 +123,7 @@ void *udp_receiver_thread(struct sockaddr_storage address, int receiver_socket, 
 			}
 		}
 
-		List_add(input_list, (char *) buf);
+		List_add(output_list, (char *) buf);
 		
 		if(strcmp(buf, "!status\n") == 0) {
 			int status_bytes;
@@ -139,32 +139,32 @@ void *udp_receiver_thread(struct sockaddr_storage address, int receiver_socket, 
 
 int main (int argc, char ** argv) 
 {
-	//RECEIVER
-	int sockfd;
-	struct addrinfo hints, *servinfo, *p;
-	int rv;
-	struct sockaddr_storage their_addr;
+	//receiver
+	int socket_info; //socket_info
+	struct addrinfo hints, *serverinfo, *p;
+	int addr_info; //stores result of getaddrinfo
+	struct sockaddr_storage address_two;
 	
 	memset(&hints, 0, sizeof hints);
-	hints.ai_family = AF_INET6; // set to AF_INET to use IPv4
-	hints.ai_socktype = SOCK_DGRAM;
-	hints.ai_flags = AI_PASSIVE; // use my IP
+	hints.ai_family = AF_INET6; // sing IPv6
+	hints.ai_socktype = SOCK_DGRAM; //
+	hints.ai_flags = AI_PASSIVE; //use my IP
 
-	if ((rv = getaddrinfo(NULL, argv[1], &hints, &servinfo)) != 0) {
-		freeaddrinfo(servinfo);
-		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
+	if ((addr_info = getaddrinfo(NULL, argv[1], &hints, &serverinfo)) != 0) {
+		freeaddrinfo(serverinfo);
+		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(addr_info));
 		return 1;
 	}
 
-	// loop through all the results and bind to the first we can
-	for(p = servinfo; p != NULL; p = p->ai_next) {
-		if ((sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) {
+	// bind to first possible result
+	for(p = serverinfo; p != NULL; p = p->ai_next) {
+		if ((socket_info = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) {
 			perror("listener: socket");
 			continue;
 		}
 
-		if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
-			close(sockfd);
+		if (bind(socket_info, p->ai_addr, p->ai_addrlen) == -1) {
+			close(socket_info);
 			perror("listener: bind");
 			continue;
 		}
@@ -173,29 +173,29 @@ int main (int argc, char ** argv)
 	}
 
 	if (p == NULL) {
-		freeaddrinfo(servinfo);
+		freeaddrinfo(serverinfo);
 		fprintf(stderr, "listener: failed to bind socket\n");
 		return 2;
 	}
 
 	//SENDER
-	int sender_sockfd;
-	struct addrinfo sender_hints, *sender_servinfo, *sender_p;
-	int sender_rv;
+	int sender_socket_info;
+	struct addrinfo sender_hints, *sender_server_info, *sender_p;
+	int sender_addr_info;
 
 	memset(&sender_hints, 0, sizeof sender_hints);
 	sender_hints.ai_family = AF_INET6; // set to AF_INET to use IPv4
 	sender_hints.ai_socktype = SOCK_DGRAM;
 
-	if ((sender_rv = getaddrinfo(argv[2], argv[3], &sender_hints, &sender_servinfo)) != 0) {
-		freeaddrinfo(sender_servinfo);
-		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(sender_rv));
+	if ((sender_addr_info = getaddrinfo(argv[2], argv[3], &sender_hints, &sender_server_info)) != 0) {
+		freeaddrinfo(sender_server_info);
+		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(sender_addr_info));
 		return 1;
 	}
 
 	// loop through all the results and make a socket
-	for(sender_p = sender_servinfo; sender_p != NULL; sender_p = sender_p->ai_next) {
-		if ((sender_sockfd = socket(sender_p->ai_family, sender_p->ai_socktype, sender_p->ai_protocol)) == -1) {
+	for(sender_p = sender_server_info; sender_p != NULL; sender_p = sender_p->ai_next) {
+		if ((sender_socket_info = socket(sender_p->ai_family, sender_p->ai_socktype, sender_p->ai_protocol)) == -1) {
 			perror("talker: socket");
 			continue;
 		}
@@ -204,45 +204,61 @@ int main (int argc, char ** argv)
 	}
 
 	if (sender_p == NULL) {
-		freeaddrinfo(sender_servinfo);
+		freeaddrinfo(sender_server_info);
 		fprintf(stderr, "talker: failed to create socket\n");
 		return 2;
 	}
 	
-	List * send_list;
-	send_list = List_create();
+	List * input_list;
+	input_list = List_create();
 	
-	List * receive_list;
-	receive_list = List_create();
-
+	List * output_list;
+	output_list = List_create();
+/*
 	struct thread_params params;
 	params.receiver_p = p;
 	params.receiveraddr = their_addr;
-	params.receiver_socketfd = sockfd;
-	params.sender_socketfd = sender_sockfd;
-	params.sender_servinfo = sender_servinfo;
+	params.receiver_socketfd = socket_info;
+	
+	params.sender_socketfd = sender_socket_info;
+	params.sender_serverinfo = sender_serverinfo;
 	params.sender_p = sender_p;
-	params.sending_list = send_list;
-	params.receiving_list = receive_list;
+	
+	params.sending_list = input_list;
+	params.receiving_list = output_list;
+*/
+	struct receiver_param receiver;
+	receiver.address = address_two;
+	receiver.receiver_socket = socket_info;
+	receiver.output_list = output_list
+	
+	struct sender_param sender;
+	sender.sender_socket = sender_socket_info;
+	sender.sender_info = sender_server_info;
+	sender.input_list = input_list;
 
-	pthread_t receiving_thr, printer_thr, sending_thr, keyboard_thr;
+	pthread_t keyboard_input_thread, udp_sender_thread, udp_receiver_thread, console_output_thread;
 
 	//create threads for receiving and printing messages
-	pthread_create(&keyboard_thr, NULL, input_msg, &params);
-	pthread_create(&sending_thr, NULL, send_msg, &params);
-	pthread_create(&receiving_thr, NULL, receive_msg, &params);
-	pthread_create(&printer_thr, NULL, print_msg, &params);
+	//keyboard_input takes list
+	pthread_create(&keyboard_input_thread, NULL, input_msg, input_list);
+	//List* input_list, int sender_socket, struct addrinfo* sender_info
+	pthread_create(&udp_sender_thread, NULL, send_msg, input_list);
+	
+	pthread_create(&udp_receiver_thread, NULL, receive_msg, &receiver);
+	
+	pthread_create(&console_output_thread, NULL, print_msg, &sender);
 
-	while(term_signal);
-	pthread_cancel(keyboard_thr);
-	pthread_cancel(sending_thr);
-	pthread_cancel(receiving_thr);
-	pthread_cancel(printer_thr);
+	while(is_exit);
+	pthread_cancel(keyboard_input_thread);
+	pthread_cancel(udp_sender_thread);
+	pthread_cancel(udp_receiver_thread);
+	pthread_cancel(console_output_thread);
 
-	pthread_join(keyboard_thr, NULL);
-	pthread_join(sending_thr, NULL);
-	pthread_join(receiving_thr, NULL);
-	pthread_join(printer_thr, NULL);
+	pthread_join(keyboard_input_thread, NULL);
+	pthread_join(udp_sender_thread, NULL);
+	pthread_join(udp_receiver_thread, NULL);
+	pthread_join(console_output_thread, NULL);
 
 	freeaddrinfo(servinfo);
 	freeaddrinfo(sender_servinfo);
