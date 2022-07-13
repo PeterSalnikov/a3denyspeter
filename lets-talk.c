@@ -34,7 +34,6 @@ struct sender_params {
 struct reciever_params {
 	struct sockaddr_storage address;
 	int receiver_socket;
-	struct addrinfo* sender_info;
 	List* output_list;
 };
 
@@ -81,7 +80,7 @@ void *udp_sender_thread(void * ptr) {
 			int numbytes;
 			if ((numbytes = sendto(params->sender_socket, message, strlen(message), 0,
 				params->sender_info->ai_addr, params->sender_info->ai_addrlen)) == -1) {
-				perror("Send Error: ");
+				perror("Sender Error: ");
 				exit(1);
 			}
 			for(i = 0; i < strlen(message); i++) {
@@ -127,10 +126,10 @@ void *udp_receiver_thread(void * ptr) {
 		char buf[BUFFER_SIZE];
 		socklen_t address_count;
 		int input_bytes;
-		address_count = sizeof params->address;
+		address_count = sizeof (params->address);
 		if ((input_bytes = recvfrom(params->receiver_socket, buf, BUFFER_SIZE , 0,
 			(struct sockaddr *)&(params->address), &address_count)) == -1) {
-			perror("Recieve error: ");
+			perror("Reciever error: ");
 			exit(1);
 		}
 
@@ -148,7 +147,7 @@ void *udp_receiver_thread(void * ptr) {
 			int status_bytes;
 			if ((status_bytes = sendto(params->receiver_socket, "Online", strlen("Online"), 0,
 					(struct sockaddr *)&(params->address), address_count)) == -1) {
-					perror("Send Error: ");
+					perror("Sender Error: ");
 					exit(1);
 			}
 		}        
@@ -178,13 +177,13 @@ int main (int argc, char ** argv)
 	// bind to first possible result
 	for(p = server_info; p != NULL; p = p->ai_next) {
 		if ((socket_info = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) {
-			perror("listener: socket");
+			perror("Reciever Error: ");
 			continue;
 		}
 
 		if (bind(socket_info, p->ai_addr, p->ai_addrlen) == -1) {
 			close(socket_info);
-			perror("listener: bind");
+			perror("Reciever Error: ");
 			continue;
 		}
 
@@ -193,7 +192,7 @@ int main (int argc, char ** argv)
 
 	if (p == NULL) {
 		freeaddrinfo(server_info);
-		fprintf(stderr, "listener: failed to bind socket\n");
+		fprintf(stderr, "Reciever Error: failed to bind socket\n");
 		return 2;
 	}
 
