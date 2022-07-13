@@ -31,7 +31,6 @@ struct sender_params {
 };
 
 struct reciever_params {
-	struct sockaddr_storage address;
 	int receiver_socket;
 	List* output_list;
 };
@@ -120,14 +119,15 @@ void *udp_sender_thread(void * ptr) {
 
 void *udp_receiver_thread(void * ptr) {
 	struct reciever_params *params = ptr;
+	struct sockaddr_storage address;
 	int i;
 	while(!is_exit) {
 		char buf[BUFFER_SIZE];
 		socklen_t address_count;
 		int input_bytes;
-		address_count = sizeof (params->address);
+		address_count = sizeof (address);
 		if ((input_bytes = recvfrom(params->receiver_socket, buf, BUFFER_SIZE , 0,
-			(struct sockaddr *)&(params->address), &address_count)) == -1) {
+			(struct sockaddr *)&(address), &address_count)) == -1) {
 			perror("Reciever error: ");
 			exit(1);
 		}
@@ -145,7 +145,7 @@ void *udp_receiver_thread(void * ptr) {
 		if(strcmp(buf, "!status\n") == 0) {
 			int status_bytes;
 			if ((status_bytes = sendto(params->receiver_socket, "Online", strlen("Online"), 0,
-					(struct sockaddr *)&(params->address), address_count)) == -1) {
+					(struct sockaddr *)&(address), address_count)) == -1) {
 					perror("Sender Error: ");
 					exit(1);
 			}
@@ -170,7 +170,6 @@ int main (int argc, char ** argv)
 	int socket_info; 
 	struct addrinfo hints, *server_info, *p;
 	int addr_info; 
-	struct sockaddr_storage address_two;
 	
 	memset(&hints, 0, sizeof hints);
 	hints.ai_family = AF_INET;
@@ -240,7 +239,6 @@ int main (int argc, char ** argv)
 	output_list = List_create();
 
 	struct reciever_params receiver;
-	receiver.address = address_two;
 	receiver.receiver_socket = socket_info;
 	receiver.output_list = output_list;
 	
