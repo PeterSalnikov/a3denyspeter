@@ -18,13 +18,13 @@ required threads:
 
 pthread_mutex_t Mutex = PTHREAD_MUTEX_INITIALIZER;
 bool is_exit = 0;
-char buffer[10000];
+char buffer[4000];
 int encryption_key = 1;
 
 void *keyboard_input_thread(List* output_list) {
 	printf("Welcome to LetS-Talk! Please type your message now.\n");
 	while(!is_exit) {
-		if(fgets(buffer, 10000, stdin)){
+		if(fgets(buffer, 4000, stdin)){
 			List_add(output_list, (char *)buffer);
 		}
 	} 
@@ -72,17 +72,17 @@ void *udp_sender_thread(List* output_list, int sender_socket, struct addrinfo* s
 				is_exit = 1;
 			}
 			if(strcmp(message, "!status\n") == 0) {
-				char buf[10000];
+				char buf[4000];
 				socklen_t addr_len;
 				int numbytes2;
 				addr_len = sender_info->ai_addrlen;
 				struct timeval tv;
 				tv.tv_sec = 0;
-				tv.tv_usec = 100000;
+				tv.tv_usec = 40000;
 				if (setsockopt(sender_socket, SOL_SOCKET, SO_RCVTIMEO,&tv,sizeof(tv)) < 0) {
 					perror("Error: ");
 				}
-				if ((numbytes2 = recvfrom(sender_socket, buf, 10000 , 0,
+				if ((numbytes2 = recvfrom(sender_socket, buf, 4000 , 0,
 					(sender_info)->ai_addr, &addr_len)) == -1) {
 					strcpy(buf, "Offline");
 					printf("Offline\n");
@@ -102,11 +102,11 @@ void *udp_sender_thread(List* output_list, int sender_socket, struct addrinfo* s
 void *udp_receiver_thread(struct sockaddr_storage address, int receiver_socket, List* input_list) {
 	int i;
 	while(!is_exit) {
-		char buf[10000];
+		char buf[4000];
 		socklen_t address_count;
 		int input_bytes;
 		address_count = sizeof address;
-		if ((input_bytes = recvfrom(receiver_socket, buf, 10000 , 0,
+		if ((input_bytes = recvfrom(receiver_socket, buf, 4000 , 0,
 			(struct sockaddr *)&(address), &address_count)) == -1) {
 			perror("Recieve error: ");
 			exit(1);
