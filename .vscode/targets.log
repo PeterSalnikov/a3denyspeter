@@ -7,7 +7,7 @@ make all --print-data-base --no-builtin-variables --no-builtin-rules --question
 
 # This program built for i386-apple-darwin11.3.0
 
-# Make data base, printed on Tue Jul 12 17:00:32 2022
+# Make data base, printed on Tue Jul 12 20:34:30 2022
 
 # Variables
 
@@ -164,38 +164,18 @@ VSCODE_PID = 86382
 
 # Not a target:
 list.c:
-#  Implicit rule search has been done.
-#  Last modified 2022-07-12 17:00:29
-#  File has been updated.
-#  Successfully updated.
-# variable set hash-table stats:
-# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+#  Implicit rule search has not been done.
+#  Modification time never checked.
+#  File has not been updated.
 
 all: lets-talk.o list.o
 #  Command-line target.
 #  Implicit rule search has not been done.
-#  Implicit/static pattern stem: `'
 #  File does not exist.
 #  File has been updated.
 #  Needs to be updated (-q is set).
-# automatic
-# @ := all
-# automatic
-# % := 
-# automatic
-# * := 
-# automatic
-# + := lets-talk.o list.o
-# automatic
-# | := 
-# automatic
-# < := lets-talk.o
-# automatic
-# ^ := lets-talk.o list.o
-# automatic
-# ? := lets-talk.o list.o
 # variable set hash-table stats:
-# Load=8/32=25%, Rehash=0, Collisions=1/10=10%
+# Load=0/32=0%, Rehash=0, Collisions=0/2=0%
 #  commands to execute (from `Makefile', line 2):
 	gcc -o lets-talk lets-talk.o list.o -pthread
 	
@@ -212,7 +192,7 @@ list.h:
 # Not a target:
 lets-talk.c:
 #  Implicit rule search has been done.
-#  Last modified 2022-07-12 17:00:29
+#  Last modified 2022-07-12 20:32:20
 #  File has been updated.
 #  Successfully updated.
 # variable set hash-table stats:
@@ -249,22 +229,36 @@ clean:
 
 list.o: list.c list.h
 #  Implicit rule search has not been done.
-#  Last modified 2022-07-12 17:00:29
-#  File has been updated.
-#  Successfully updated.
-# variable set hash-table stats:
-# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+#  Modification time never checked.
+#  File has not been updated.
 #  commands to execute (from `Makefile', line 8):
 	gcc -c list.c
 	
 
 lets-talk.o: lets-talk.c list.h
 #  Implicit rule search has not been done.
+#  Implicit/static pattern stem: `'
 #  Last modified 2022-07-12 17:00:29
 #  File has been updated.
-#  Successfully updated.
+#  Needs to be updated (-q is set).
+# automatic
+# @ := lets-talk.o
+# automatic
+# % := 
+# automatic
+# * := 
+# automatic
+# + := lets-talk.c list.h
+# automatic
+# | := 
+# automatic
+# < := lets-talk.c
+# automatic
+# ^ := lets-talk.c list.h
+# automatic
+# ? := lets-talk.c
 # variable set hash-table stats:
-# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+# Load=8/32=25%, Rehash=0, Collisions=1/10=10%
 #  commands to execute (from `Makefile', line 5):
 	gcc -c lets-talk.c
 	
@@ -282,6 +276,6 @@ lets-talk.o: lets-talk.c list.h
 # strcache size: total = 4096 / max = 4096 / min = 4096 / avg = 4096
 # strcache free: total = 4087 / max = 4087 / min = 4087 / avg = 4087
 
-# Finished Make data base on Tue Jul 12 17:00:32 2022
+# Finished Make data base on Tue Jul 12 20:34:30 2022
 
  

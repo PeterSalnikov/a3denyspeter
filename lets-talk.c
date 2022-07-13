@@ -11,19 +11,35 @@ required threads:
 #include <stdio.h>
 #include <stdlib.h>
 #include "list.h"
+#include <string.h> 
 #include <pthread.h>
 #include <netdb.h>
 #include <sys/time.h>
+#include <unistd.h>
 // #define STDIN 0 
 
 const int BUFFER_SIZE = 4000;
-char buffer[BUFFER_SIZE];
+char buffer[4000];
 int is_exit = 0;
 int encryption_key = 1;
 
 pthread_mutex_t Mutex = PTHREAD_MUTEX_INITIALIZER;
 
-void *keyboard_input_thread(List* input_list) {
+struct sender_params {
+	List* input_list;
+	int sender_socket;
+	struct addrinfo* sender_info;
+};
+
+struct reciever_params {
+	struct sockaddr_storage address;
+	int receiver_socket;
+	struct addrinfo* sender_info;
+	List* output_list;
+};
+
+void *keyboard_input_thread(void * ptr) {
+	List* input_list = ptr;
 	printf("Welcome to LetS-Talk! Please type your message now.\n");
 	// Get keywords
 	while(!is_exit) {
@@ -34,10 +50,11 @@ void *keyboard_input_thread(List* input_list) {
 	pthread_exit(NULL);
 }
 
-void *console_output_thread(List* input_list) {
+void *console_output_thread(void * ptr) {
+	List* output_list = ptr;
 	while(!is_exit) {
-		if(List_count(input_list)) {
-			char * msg = List_remove(input_list);  
+		if(List_count(output_list)) {
+			char * msg = List_remove(output_list);  
 			printf("%s", msg);
 			fflush(stdout);
 			if(strcmp(msg, "!exit\n") == 0) {
@@ -49,11 +66,12 @@ void *console_output_thread(List* input_list) {
 
 }
 
-void *udp_sender_thread(List* input_list, int sender_socket, struct addrinfo* sender_info) {
+void *udp_sender_thread(void * ptr) {
+	struct sender_params *params = ptr;
 	int i;
 	while(!is_exit) {
-		if(List_count(input_list)) {
-			char * message = List_remove(input_list);
+		if(List_count(params->input_list)) {
+			char * message = List_remove(params->input_list);
 			// encryption
 			for(i = 0; i < strlen(message); i++) {
 				if(message[i] != '\n' && message[i] != '\0') {
@@ -61,8 +79,8 @@ void *udp_sender_thread(List* input_list, int sender_socket, struct addrinfo* se
 				}
 			}
 			int numbytes;
-			if ((numbytes = sendto(sender_socket, message, strlen(message), 0,
-				sender_info->ai_addr, sender_info->ai_addrlen)) == -1) {
+			if ((numbytes = sendto(params->sender_socket, message, strlen(message), 0,
+				params->sender_info->ai_addr, params->sender_info->ai_addrlen)) == -1) {
 				perror("Send Error: ");
 				exit(1);
 			}
@@ -78,15 +96,15 @@ void *udp_sender_thread(List* input_list, int sender_socket, struct addrinfo* se
 				char buf[BUFFER_SIZE];
 				socklen_t addr_len;
 				int numbytes2;
-				addr_len = sender_info->ai_addrlen;
+				addr_len = params->sender_info->ai_addrlen;
 				struct timeval tv;
 				tv.tv_sec = 0;
 				tv.tv_usec = BUFFER_SIZE;
-				if (setsockopt(sender_socket, SOL_SOCKET, SO_RCVTIMEO,&tv,sizeof(tv)) < 0) {
+				if (setsockopt(params->sender_socket, SOL_SOCKET, SO_RCVTIMEO,&tv,sizeof(tv)) < 0) {
 					perror("Error: ");
 				}
-				if ((numbytes2 = recvfrom(sender_socket, buf, BUFFER_SIZE , 0,
-					(sender_info)->ai_addr, &addr_len)) == -1) {
+				if ((numbytes2 = recvfrom(params->sender_socket, buf, BUFFER_SIZE , 0,
+					(params->sender_info)->ai_addr, &addr_len)) == -1) {
 					strcpy(buf, "Offline");
 					printf("Offline\n");
 				}
@@ -102,15 +120,16 @@ void *udp_sender_thread(List* input_list, int sender_socket, struct addrinfo* se
 
 }
 
-void *udp_receiver_thread(struct sockaddr_storage address, int receiver_socket, List* output_list) {
+void *udp_receiver_thread(void * ptr) {
+	struct reciever_params *params = ptr;
 	int i;
 	while(!is_exit) {
 		char buf[BUFFER_SIZE];
 		socklen_t address_count;
 		int input_bytes;
-		address_count = sizeof address;
-		if ((input_bytes = recvfrom(receiver_socket, buf, BUFFER_SIZE , 0,
-			(struct sockaddr *)&(address), &address_count)) == -1) {
+		address_count = sizeof params->address;
+		if ((input_bytes = recvfrom(params->receiver_socket, buf, BUFFER_SIZE , 0,
+			(struct sockaddr *)&(params->address), &address_count)) == -1) {
 			perror("Recieve error: ");
 			exit(1);
 		}
@@ -123,12 +142,12 @@ void *udp_receiver_thread(struct sockaddr_storage address, int receiver_socket, 
 			}
 		}
 
-		List_add(output_list, (char *) buf);
+		List_add(params->output_list, (char *) buf);
 		
 		if(strcmp(buf, "!status\n") == 0) {
 			int status_bytes;
-			if ((status_bytes = sendto(receiver_socket, "Online", strlen("Online"), 0,
-					(struct sockaddr *)&(address), address_count)) == -1) {
+			if ((status_bytes = sendto(params->receiver_socket, "Online", strlen("Online"), 0,
+					(struct sockaddr *)&(params->address), address_count)) == -1) {
 					perror("Send Error: ");
 					exit(1);
 			}
@@ -141,7 +160,7 @@ int main (int argc, char ** argv)
 {
 	//receiver
 	int socket_info; //socket_info
-	struct addrinfo hints, *serverinfo, *p;
+	struct addrinfo hints, *server_info, *p;
 	int addr_info; //stores result of getaddrinfo
 	struct sockaddr_storage address_two;
 	
@@ -150,14 +169,14 @@ int main (int argc, char ** argv)
 	hints.ai_socktype = SOCK_DGRAM; //
 	hints.ai_flags = AI_PASSIVE; //use my IP
 
-	if ((addr_info = getaddrinfo(NULL, argv[1], &hints, &serverinfo)) != 0) {
-		freeaddrinfo(serverinfo);
+	if ((addr_info = getaddrinfo(NULL, argv[1], &hints, &server_info)) != 0) {
+		freeaddrinfo(server_info);
 		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(addr_info));
 		return 1;
 	}
 
 	// bind to first possible result
-	for(p = serverinfo; p != NULL; p = p->ai_next) {
+	for(p = server_info; p != NULL; p = p->ai_next) {
 		if ((socket_info = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) {
 			perror("listener: socket");
 			continue;
@@ -173,7 +192,7 @@ int main (int argc, char ** argv)
 	}
 
 	if (p == NULL) {
-		freeaddrinfo(serverinfo);
+		freeaddrinfo(server_info);
 		fprintf(stderr, "listener: failed to bind socket\n");
 		return 2;
 	}
@@ -227,41 +246,38 @@ int main (int argc, char ** argv)
 	params.sending_list = input_list;
 	params.receiving_list = output_list;
 */
-	struct receiver_param receiver;
+	struct reciever_params receiver;
 	receiver.address = address_two;
 	receiver.receiver_socket = socket_info;
-	receiver.output_list = output_list
+	receiver.output_list = output_list;
 	
-	struct sender_param sender;
+	struct sender_params sender;
 	sender.sender_socket = sender_socket_info;
 	sender.sender_info = sender_server_info;
 	sender.input_list = input_list;
 
-	pthread_t keyboard_input_thread, udp_sender_thread, udp_receiver_thread, console_output_thread;
+	pthread_t keyboard_input, udp_sender, udp_receiver, console_output;
 
 	//create threads for receiving and printing messages
-	//keyboard_input takes list
-	pthread_create(&keyboard_input_thread, NULL, input_msg, input_list);
-	//List* input_list, int sender_socket, struct addrinfo* sender_info
-	pthread_create(&udp_sender_thread, NULL, send_msg, input_list);
+	pthread_create(&keyboard_input, NULL, keyboard_input_thread, input_list);
+	pthread_create(&console_output, NULL, console_output_thread, output_list);
+	pthread_create(&udp_sender, NULL, udp_sender_thread, &sender);
+	pthread_create(&udp_receiver, NULL, udp_receiver_thread, &receiver);
 	
-	pthread_create(&udp_receiver_thread, NULL, receive_msg, &receiver);
-	
-	pthread_create(&console_output_thread, NULL, print_msg, &sender);
 
-	while(is_exit);
-	pthread_cancel(keyboard_input_thread);
-	pthread_cancel(udp_sender_thread);
-	pthread_cancel(udp_receiver_thread);
-	pthread_cancel(console_output_thread);
+	while(!is_exit);
+	pthread_cancel(keyboard_input);
+	pthread_cancel(udp_sender);
+	pthread_cancel(udp_receiver);
+	pthread_cancel(console_output);
 
-	pthread_join(keyboard_input_thread, NULL);
-	pthread_join(udp_sender_thread, NULL);
-	pthread_join(udp_receiver_thread, NULL);
-	pthread_join(console_output_thread, NULL);
+	pthread_join(keyboard_input, NULL);
+	pthread_join(udp_sender, NULL);
+	pthread_join(udp_receiver, NULL);
+	pthread_join(console_output, NULL);
 
-	freeaddrinfo(servinfo);
-	freeaddrinfo(sender_servinfo);
+	freeaddrinfo(server_info);
+	freeaddrinfo(sender_server_info);
 
 	pthread_exit(0);
 }

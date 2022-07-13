@@ -2,6 +2,7 @@
   "makefile.extensionOutputFolder": "./.vscode",
   "files.associations": {
     "*.js": "javascriptreact",
-    "pthread.h": "c"
+    "pthread.h": "c",
+    "unistd.h": "c"
   }
 }
