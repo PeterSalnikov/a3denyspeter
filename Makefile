@@ -1,5 +1,5 @@
 all: lets-talk.c
-	gcc -g -Wall -pthread -o lets-talk lets_talk.c list.c
+	gcc -g -Wall -pthread -o lets-talk lets-talk.c list.c
 	
 clean:
 	rm -rf lets-talk.o list.o
