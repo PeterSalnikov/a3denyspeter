@@ -100,7 +100,7 @@ void *udp_sender_thread(void * ptr) {
 				tv.tv_sec = 0;
 				tv.tv_usec = BUFFER_SIZE;
 				if (setsockopt(params->sender_socket, SOL_SOCKET, SO_RCVTIMEO,&tv,sizeof(tv)) < 0) {
-					perror("Error: ");
+					perror("Sender Error: ");
 				}
 				if ((numbytes2 = recvfrom(params->sender_socket, buf, BUFFER_SIZE , 0,
 					(params->sender_info)->ai_addr, &addr_len)) == -1) {
@@ -157,6 +157,7 @@ void *udp_receiver_thread(void * ptr) {
 
 int main (int argc, char ** argv) 
 {
+	printf("ADDRESS: %s\n", argv[2]);
 	//receiver
 	int socket_info; //socket_info
 	struct addrinfo hints, *server_info, *p;
@@ -164,10 +165,9 @@ int main (int argc, char ** argv)
 	struct sockaddr_storage address_two;
 	
 	memset(&hints, 0, sizeof hints);
-	hints.ai_family = AF_INET6; // sing IPv6
-	hints.ai_socktype = SOCK_DGRAM; //
-	hints.ai_flags = AI_PASSIVE; //use my IP
-
+	hints.ai_family = AF_INET;
+	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_flags = AI_PASSIVE;
 	if ((addr_info = getaddrinfo(NULL, argv[1], &hints, &server_info)) != 0) {
 		freeaddrinfo(server_info);
 		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(addr_info));
@@ -202,19 +202,18 @@ int main (int argc, char ** argv)
 	int sender_addr_info;
 
 	memset(&sender_hints, 0, sizeof sender_hints);
-	sender_hints.ai_family = AF_INET6; // set to AF_INET to use IPv4
+	sender_hints.ai_family = AF_INET;
 	sender_hints.ai_socktype = SOCK_DGRAM;
-
 	if ((sender_addr_info = getaddrinfo(argv[2], argv[3], &sender_hints, &sender_server_info)) != 0) {
 		freeaddrinfo(sender_server_info);
-		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(sender_addr_info));
+		fprintf(stderr, "Sender Error: %s\n", gai_strerror(sender_addr_info));
 		return 1;
 	}
 
 	// loop through all the results and make a socket
 	for(sender_p = sender_server_info; sender_p != NULL; sender_p = sender_p->ai_next) {
 		if ((sender_socket_info = socket(sender_p->ai_family, sender_p->ai_socktype, sender_p->ai_protocol)) == -1) {
-			perror("talker: socket");
+			perror("Sender Error: ");
 			continue;
 		}
 
@@ -223,7 +222,7 @@ int main (int argc, char ** argv)
 
 	if (sender_p == NULL) {
 		freeaddrinfo(sender_server_info);
-		fprintf(stderr, "talker: failed to create socket\n");
+		fprintf(stderr, "Sender Error: failed to create socket\n");
 		return 2;
 	}
 	
