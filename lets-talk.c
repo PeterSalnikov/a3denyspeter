@@ -15,7 +15,7 @@
 #define STDIN 0 
 
 pthread_mutex_t Mutex = PTHREAD_MUTEX_INITIALIZER;
-bool term_signal = 1;
+bool is_exit = 0;
 char buffer[4000];
 int encryption_key = 1;
 struct thread_params {
@@ -27,21 +27,20 @@ struct thread_params {
     List * receiving_list;
 };
 
-void *receive_msg(void * ptr) {
-	struct thread_params *params = ptr;
+void *input_thread(struct sockaddr_storage address, int receiver_socket, List* input_list) {
 	int i;
-	while(term_signal) {
+	while(!is_exit) {
 		char buf[4000];
-		socklen_t addr_len;
-		int numbytes;
-		addr_len = sizeof params->receiveraddr;
-		if ((numbytes = recvfrom(params->receiver_socketfd, buf, 4000 , 0,
-			(struct sockaddr *)&(params->receiveraddr), &addr_len)) == -1) {
-			perror("recvfrom");
+		socklen_t address_count;
+		int input_bytes;
+		address_count = sizeof address;
+		if ((input_bytes = recvfrom(receiver_socket, buf, 4000 , 0,
+			(struct sockaddr *)&(address), &address_count)) == -1) {
+			perror("Recieve error: ");
 			exit(1);
 		}
 
-		buf[numbytes] = '\0';
+		buf[input_bytes] = '\0';
 		// decryption
 		for(i = 0; i < strlen(buf); i++) {
 			if(buf[i] != '\n' && buf[i] != '\0') {
@@ -49,39 +48,36 @@ void *receive_msg(void * ptr) {
 			}
 		}
 
-		List_add(params->receiving_list, (char *) buf);
+		List_add(input_list, (char *) buf);
 		
 		if(strcmp(buf, "!status\n") == 0) {
-			int numbytes2;
-			char * msg = "Online";
-			if ((numbytes2 = sendto(params->receiver_socketfd, msg, strlen(msg), 0,
-					(struct sockaddr *)&(params->receiveraddr), addr_len)) == -1) {
-					perror("talker: sendto");
+			int status_bytes;
+			if ((status_bytes = sendto(receiver_socket, "Online", strlen("Online"), 0,
+					(struct sockaddr *)&(address), address_count)) == -1) {
+					perror("Send Error: ");
 					exit(1);
 			}
 		}        
 	}
 	pthread_exit(NULL);
 }
-void *print_msg(void * ptr) {
-	struct thread_params *params = ptr;
-	while(term_signal) {
-		if(List_count(params->receiving_list)) {
-			char * msg = List_remove(params->receiving_list);  
+void *output_thread(List* input_list) {
+	while(!is_exit) {
+		if(List_count(input_list)) {
+			char * msg = List_remove(input_list);  
 			printf("%s", msg);
 			fflush(stdout);
 			if(strcmp(msg, "!exit\n") == 0) {
-					term_signal = 0;
+					is_exit = 1;
 			}
 		}
 	}
 	pthread_exit(NULL);
 
 }
-void *send_msg(void * ptr) {
-	struct thread_params *params = ptr;
+void *send_thread(void * ptr) {
 	int i;
-	while(term_signal) {
+	while(!is_exit) {
 		if(List_count(params->sending_list)) {
 			char * msg = List_remove(params->sending_list);
 			// encryption
