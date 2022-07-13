@@ -1,40 +1,112 @@
+/*
+required threads:
+
+1. one thread awaits input from the keyboard.
+2. the other thread awaits a UDP datagram from another process.
+3. there will also be a thread that prints messages (sent and received) to the screen.
+4. finally, a thread that sends data to the remote UNIX process over the network using UDP (use localhost IP(127.0.0.1) while testing it on the same machine with two terminals).
+***two lists are required*** one for keyboard/sender, one for receiver, printer
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
-#include <pthread.h>
-#include <unistd.h> 
-#include <string.h> 
-#include <sys/types.h> 
-#include <sys/socket.h> 
-#include <arpa/inet.h> 
-#include <netinet/in.h> 
 #include "list.h"
-#include <sys/types.h>
-#include <sys/socket.h>
+#include <pthread.h>
 #include <netdb.h>
 #include <sys/time.h>
-#define STDIN 0 
+// #define STDIN 0 
 
 pthread_mutex_t Mutex = PTHREAD_MUTEX_INITIALIZER;
 bool is_exit = 0;
-char buffer[4000];
+char buffer[10000];
 int encryption_key = 1;
-struct thread_params {
-    int receiver_socketfd;
-    int sender_socketfd;
-    struct sockaddr_storage receiveraddr;
-    struct addrinfo * sender_servinfo, *sender_p, *receiver_p;
-    List * sending_list;
-    List * receiving_list;
-};
 
-void *input_thread(struct sockaddr_storage address, int receiver_socket, List* input_list) {
+void *keyboard_input_thread(List* output_list) {
+	printf("Welcome to LetS-Talk! Please type your message now.\n");
+	while(!is_exit) {
+		if(fgets(buffer, 10000, stdin)){
+			List_add(output_list, (char *)buffer);
+		}
+	} 
+	pthread_exit(NULL);
+}
+
+void *console_output_thread(List* input_list) {
+	while(!is_exit) {
+		if(List_count(input_list)) {
+			char * msg = List_remove(input_list);  
+			printf("%s", msg);
+			fflush(stdout);
+			if(strcmp(msg, "!exit\n") == 0) {
+					is_exit = 1;
+			}
+		}
+	}
+	pthread_exit(NULL);
+
+}
+
+void *udp_sender_thread(List* output_list, int sender_socket, struct addrinfo* sender_info) {
 	int i;
 	while(!is_exit) {
-		char buf[4000];
+		if(List_count(output_list)) {
+			char * message = List_remove(output_list);
+			// encryption
+			for(i = 0; i < strlen(message); i++) {
+				if(message[i] != '\n' && message[i] != '\0') {
+					message[i] += encryption_key;
+				}
+			}
+			int numbytes;
+			if ((numbytes = sendto(sender_socket, message, strlen(message), 0,
+				sender_info->ai_addr, sender_info->ai_addrlen)) == -1) {
+				perror("Send Error: ");
+				exit(1);
+			}
+			for(i = 0; i < strlen(message); i++) {
+				if(message[i] != '\n' && message[i] != '\0') {
+					message[i] -= encryption_key;
+				}
+			}
+			if(strcmp(message, "!exit\n") == 0) {
+				is_exit = 1;
+			}
+			if(strcmp(message, "!status\n") == 0) {
+				char buf[10000];
+				socklen_t addr_len;
+				int numbytes2;
+				addr_len = sender_info->ai_addrlen;
+				struct timeval tv;
+				tv.tv_sec = 0;
+				tv.tv_usec = 100000;
+				if (setsockopt(sender_socket, SOL_SOCKET, SO_RCVTIMEO,&tv,sizeof(tv)) < 0) {
+					perror("Error: ");
+				}
+				if ((numbytes2 = recvfrom(sender_socket, buf, 10000 , 0,
+					(sender_info)->ai_addr, &addr_len)) == -1) {
+					strcpy(buf, "Offline");
+					printf("Offline\n");
+				}
+				if(strcmp(buf, "Online") == 0) {
+					buf[numbytes2] = '\0';
+					printf("%s\n", buf);
+				}
+					
+			}     
+		}
+	}
+  pthread_exit(NULL);
+
+}
+
+void *udp_receiver_thread(struct sockaddr_storage address, int receiver_socket, List* input_list) {
+	int i;
+	while(!is_exit) {
+		char buf[10000];
 		socklen_t address_count;
 		int input_bytes;
 		address_count = sizeof address;
-		if ((input_bytes = recvfrom(receiver_socket, buf, 4000 , 0,
+		if ((input_bytes = recvfrom(receiver_socket, buf, 10000 , 0,
 			(struct sockaddr *)&(address), &address_count)) == -1) {
 			perror("Recieve error: ");
 			exit(1);
@@ -59,82 +131,6 @@ void *input_thread(struct sockaddr_storage address, int receiver_socket, List* i
 			}
 		}        
 	}
-	pthread_exit(NULL);
-}
-void *output_thread(List* input_list) {
-	while(!is_exit) {
-		if(List_count(input_list)) {
-			char * msg = List_remove(input_list);  
-			printf("%s", msg);
-			fflush(stdout);
-			if(strcmp(msg, "!exit\n") == 0) {
-					is_exit = 1;
-			}
-		}
-	}
-	pthread_exit(NULL);
-
-}
-void *send_thread(void * ptr) {
-	int i;
-	while(!is_exit) {
-		if(List_count(params->sending_list)) {
-			char * msg = List_remove(params->sending_list);
-			// encryption
-			for(i = 0; i < strlen(msg); i++) {
-				if(msg[i] != '\n' && msg[i] != '\0') {
-					msg[i] += encryption_key;
-				}
-			}
-			int numbytes;
-			if ((numbytes = sendto(params->sender_socketfd, msg, strlen(msg), 0,
-				(params->sender_p)->ai_addr, (params->sender_p)->ai_addrlen)) == -1) {
-				perror("talker: sendto");
-				exit(1);
-			}
-			for(i = 0; i < strlen(msg); i++) {
-				if(msg[i] != '\n' && msg[i] != '\0') {
-					msg[i] -= encryption_key;
-				}
-			}
-			if(strcmp(msg, "!exit\n") == 0) {
-				term_signal = 0;
-			}
-			if(strcmp(msg, "!status\n") == 0) {
-				char buf[4000];
-				socklen_t addr_len;
-				int numbytes2;
-				addr_len = (params->sender_p)->ai_addrlen;
-				struct timeval tv;
-				tv.tv_sec = 0;
-				tv.tv_usec = 100000;
-				if (setsockopt(params->sender_socketfd, SOL_SOCKET, SO_RCVTIMEO,&tv,sizeof(tv)) < 0) {
-					perror("Error");
-				}
-				if ((numbytes2 = recvfrom(params->sender_socketfd, buf, 4000 , 0,
-					(params->sender_p)->ai_addr, &addr_len)) == -1) {
-					strcpy(buf, "Offline");
-					printf("Offline\n");
-				}
-				if(strcmp(buf, "Online") == 0) {
-					buf[numbytes2] = '\0';
-					printf("%s\n", buf);
-				}
-					
-			}     
-		}
-	}
-  pthread_exit(NULL);
-
-}
-void *input_msg(void * ptr) {
-	struct thread_params *params = ptr;
-	printf("Welcome to lets-talk! Please type your message now\n");
-	while(term_signal) {
-		if(fgets(buffer, 4000, stdin)){
-			List_add(params->sending_list, (char *)buffer);
-		}
-	} 
 	pthread_exit(NULL);
 }
 
