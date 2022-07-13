@@ -4,5 +4,5 @@ all: lets-talk.c
 clean:
 	rm -rf lets-talk.o list.o
 
-Valgrind: 
+Valgrind:
 	valgrind --leak-check=full ./lets-talk 3000 localhost 3001
