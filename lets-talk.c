@@ -16,6 +16,7 @@ required threads:
 #include <netdb.h>
 #include <sys/time.h>
 #include <unistd.h>
+#include <arpa/inet.h>
 
 const int BUFFER_SIZE = 4000;
 char buffer[4000];
@@ -45,6 +46,16 @@ void *keyboard_input_thread(void * ptr) {
 		}
 	} 
 	pthread_exit(NULL);
+}
+
+int isValidIpAddress(char *ipAddress)
+{
+	if(strcmp(ipAddress, "localhost") == 0) {
+		return 1;
+	}
+	struct sockaddr_in sa;
+	int result = inet_pton(AF_INET, ipAddress, &(sa.sin_addr));
+	return result;
 }
 
 void *console_output_thread(void * ptr) {
@@ -129,7 +140,7 @@ void *udp_receiver_thread(void * ptr) {
 		if ((input_bytes = recvfrom(params->receiver_socket, buf, BUFFER_SIZE , 0,
 			(struct sockaddr *)&(address), &address_count)) == -1) {
 			perror("Reciever error: ");
-			exit(1);
+			exit(0);
 		}
 
 		buf[input_bytes] = '\0';
@@ -157,13 +168,13 @@ void *udp_receiver_thread(void * ptr) {
 int main (int argc, char ** argv) 
 {
 
-	if(argc < 4) {
+	if(argc < 4 || !isValidIpAddress(argv[2])) {
 		printf("Usage:\n");
 		printf("\t./lets-talk <local port> <remote host> <remote port>\n");
 		printf("Examples:\n");
 		printf("\t./lets-talk 3000 192.168.0.513 3001\n");
 		printf("\t./lets-talk 3000 some-computer-name 3001\n");
-		return 1;
+		return 0;
 	}
 
 	//receiver
